@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🛒 Loja do Aluno</title>
+<link rel="stylesheet" href="style.css"/>
+<script type="module">
+  import { db } from "./firebase.js";
+  import { collection, getDocs, getDoc, doc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  let usuarioId = localStorage.getItem("usuarioId");
+  if (!usuarioId) {
+    window.location.href = "index.html";
+  }
+
+  let aluno = {};
+  let carrinho = [];
+
+  async function carregarAluno() {
+    const docSnap = await getDoc(doc(db, "usuarios", usuarioId));
+    aluno = docSnap.data();
+    document.getElementById("alunoInfo").innerHTML = `👋 Olá, ${aluno.nome} | 💰 Saldo: <strong id="saldo">${aluno.saldo || 0}</strong>`;
+  }
+
+  async function carregarProdutos() {
+    const querySnapshot = await getDocs(collection(db, "produtos"));
+    const lista = document.getElementById("listaProdutos");
+    lista.innerHTML = "";
+    querySnapshot.forEach((docSnap) => {
+      const produto = docSnap.data();
+      lista.innerHTML += `
+        <div class="card">
+          <h3>${produto.emoji} ${produto.nome}</h3>
+          <p>💲${produto.preco}</p>
+          <button onclick="adicionarCarrinho('${docSnap.id}', '${produto.nome}', ${produto.preco}, '${produto.emoji}')">🛒 Adicionar</button>
+        </div>
+      `;
+    });
+  }
+
+  window.adicionarCarrinho = function(id, nome, preco, emoji) {
+    carrinho.push({ id, nome, preco, emoji });
+    atualizarCarrinho();
+  };
+
+  function atualizarCarrinho() {
+    const lista = document.getElementById("carrinho");
+    lista.innerHTML = "";
+    let total = 0;
+    carrinho.forEach((item, index) => {
+      total += item.preco;
+      lista.innerHTML += `<li>${item.emoji} ${item.nome} - 💲${item.preco} <button onclick="removerCarrinho(${index})">❌</button></li>`;
+    });
+    document.getElementById("total").innerText = total;
+  }
+
+  window.removerCarrinho = function(index) {
+    carrinho.splice(index, 1);
+    atualizarCarrinho();
+  };
+
+  window.finalizarCompra = async function() {
+    let total = carrinho.reduce((acc, item) => acc + item.preco, 0);
+
+    if (total > aluno.saldo) {
+      alert("Saldo insuficiente!");
+      return;
+    }
+
+    // Atualiza saldo do aluno
+    const novoSaldo = aluno.saldo - total;
+    await updateDoc(doc(db, "usuarios", usuarioId), { saldo: novoSaldo });
+    aluno.saldo = novoSaldo;
+    document.getElementById("saldo").innerText = novoSaldo;
+
+    // Registra histórico
+    for (const item of carrinho) {
+      await addDoc(collection(db, "historico"), {
+        alunoId: usuarioId,
+        alunoNome: aluno.nome,
+        produto: item.nome,
+        preco: item.preco,
+        data: new Date().toISOString()
+      });
+    }
+
+    carrinho = [];
+    atualizarCarrinho();
+    alert("Compra realizada com sucesso!");
+  };
+
+  carregarAluno();
+  carregarProdutos();
+</script>
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+</head>
+<body>
+<header>
+  <h1>🛒 Loja</h1>
+  <div id="alunoInfo"></div>
+</header>
+<main>
+  <h2>Produtos</h2>
+  <div id="listaProdutos" class="grid"></div>
+
+  <h2>Carrinho</h2>
+  <ul id="carrinho"></ul>
+  <p><strong>Total: 💲<span id="total">0</span></strong></p>
+  <button onclick="finalizarCompra()">✅ Finalizar Compra</button>
+</main>
+</body>
+</html>

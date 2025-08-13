@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>👨‍🏫 Painel do Professor</title>
+<link rel="stylesheet" href="style.css"/>
+<script type="module">
+  import { db } from "./firebase.js";
+  import { collection, getDocs, updateDoc, doc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  let usuarioId = localStorage.getItem("usuarioId");
+  if (!usuarioId) {
+    window.location.href = "index.html";
+  }
+
+  async function carregarAlunos() {
+    const querySnapshot = await getDocs(collection(db, "usuarios"));
+    const lista = document.getElementById("listaAlunos");
+    lista.innerHTML = "";
+    querySnapshot.forEach((docSnap) => {
+      const aluno = docSnap.data();
+      if (aluno.tipo === "aluno") {
+  lista.innerHTML += `
+  <div class="card">
+    <h3>${aluno.nome} (${aluno.turma})</h3>
+    <p>💰 Saldo: ${aluno.saldo || 0}</p>
+    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+      <button onclick="alterarSaldo('${docSnap.id}', 1)" style="background-color: #4CAF50; color: white; border: none; padding: 5px 10px; border-radius: 5px;">➕ 1</button>
+      <button onclick="alterarSaldo('${docSnap.id}', -1)" style="background-color: #f44336; color: white; border: none; padding: 5px 10px; border-radius: 5px;">➖ 1</button>
+      <button onclick="alterarSaldo('${docSnap.id}', 10)" style="background-color: #2e7d32; color: white; border: none; padding: 5px 10px; border-radius: 5px;">➕ 10</button>
+      <button onclick="alterarSaldo('${docSnap.id}', -10)" style="background-color: #c62828; color: white; border: none; padding: 5px 10px; border-radius: 5px;">➖ 10</button>
+    </div>
+  </div>
+`;
+      }
+    });
+  }
+
+  window.alterarSaldo = async function(uid, valor) {
+    const alunoRef = doc(db, "usuarios", uid);
+    const alunosSnap = await getDocs(collection(db, "usuarios"));
+    alunosSnap.forEach(async (u) => {
+      if (u.id === uid) {
+        const atual = u.data().saldo || 0;
+        await updateDoc(alunoRef, { saldo: atual + valor });
+        carregarAlunos();
+      }
+    });
+  };
+
+  // Função para carregar histórico
+  async function carregarHistorico() {
+    const historicoRef = collection(db, "historico");
+    const q = query(historicoRef, orderBy("data", "desc"));
+    const querySnapshot = await getDocs(q);
+
+    const lista = document.getElementById("listaHistorico");
+    lista.innerHTML = "";
+
+    querySnapshot.forEach((docSnap) => {
+      const compra = docSnap.data();
+      const dataFormatada = new Date(compra.data).toLocaleString("pt-BR");
+      lista.innerHTML += `<li>📅 ${dataFormatada} - 👩‍🎓 ${compra.alunoNome} - ${compra.produto} - 💲${compra.preco}</li>`;
+    });
+
+    if (lista.innerHTML === "") {
+      lista.innerHTML = "<li>Nenhuma compra registrada ainda.</li>";
+    }
+  }
+
+  // Carregar alunos e histórico assim que abrir
+  carregarAlunos();
+  carregarHistorico();
+
+  // Disponibilizar no escopo global
+  window.carregarHistorico = carregarHistorico;
+</script>
+<link rel="icon" href="favicon.ico" type="image/x-icon">
+</head>
+<body>
+  <header><h1>👨‍🏫 Painel do Professor</h1></header>
+ <main>
+  <div style="text-align:center; margin-bottom:1rem;">
+  <button onclick="window.location.href='professor-cadastro.html'">➕ Cadastrar Novo Usuário</button>
+  <button onclick="window.location.href='professor-produtos.html'">🛒 Cadastrar Produto</button>
+  <button onclick="window.location.href='professor-produtos-gerenciar.html'">🛠️ Gerenciar Produtos</button>
+  <button onclick="sair()" style="margin-left:10px;">🚪 Sair</button>
+</div>
+
+
+  <h2>📚 Lista de Alunos</h2>
+  <div id="listaAlunos" class="grid"></div>
+
+  <h2>📜 Histórico de Compras</h2>
+<div>
+  <label for="filtroTurma">Filtrar por turma:</label>
+  <select id="filtroTurma" onchange="carregarHistorico()">
+    <option value="">Todas</option>
+  </select>
+  <button onclick="carregarHistorico()">🔄 Atualizar Histórico</button>
+</div>
+<ul id="listaHistorico"></ul>
+
+<script type="module">
+  import { db } from "./firebase.js";
+  import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  let usuariosCache = {};
+
+  // Popula o select de turmas **uma única vez**
+  async function carregarUsuarios() {
+    const usuariosSnap = await getDocs(collection(db, "usuarios"));
+    const selectTurma = document.getElementById("filtroTurma");
+    const turmas = new Set();
+
+    usuariosSnap.forEach(docSnap => {
+      const u = docSnap.data();
+      usuariosCache[docSnap.id] = u;
+      if(u.tipo === "aluno" && u.turma) turmas.add(u.turma);
+    });
+
+    // Adiciona turmas ao select apenas se ainda não estiverem lá
+    turmas.forEach(t => {
+      if (![...selectTurma.options].some(opt => opt.value === t)) {
+        selectTurma.innerHTML += `<option value="${t}">${t}</option>`;
+      }
+    });
+  }
+
+  window.carregarHistorico = async function() {
+    const historicoSnap = await getDocs(collection(db, "historico"));
+    const lista = document.getElementById("listaHistorico");
+    lista.innerHTML = "";
+
+    const turmaSelecionada = document.getElementById("filtroTurma").value;
+
+    historicoSnap.forEach(docSnap => {
+      const compra = docSnap.data();
+      const aluno = usuariosCache[compra.alunoId];
+      if (!aluno) return;
+      if (turmaSelecionada && aluno.turma !== turmaSelecionada) return;
+
+      const dataFormatada = new Date(compra.data).toLocaleString("pt-BR");
+      lista.innerHTML += `<li>📅 ${dataFormatada} - 👩‍🎓 ${aluno.nome} (${aluno.turma}) - ${compra.produto} - 💲${compra.preco}</li>`;
+    });
+
+    if (lista.innerHTML === "") {
+      lista.innerHTML = "<li>Nenhuma compra registrada nessa turma.</li>";
+    }
+  };
+
+  // Inicializa
+  await carregarUsuarios();
+  carregarHistorico();
+</script>
+
+</main>
+
+<script>
+  function sair() {
+    localStorage.removeItem("usuarioId");
+    window.location.href = "index.html";
+  }
+</script>
+</body>
+</html>
