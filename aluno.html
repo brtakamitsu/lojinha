@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🛒 Loja do Aluno</title>
+<link rel="stylesheet" href="style.css"/>
+<script type="module">
+  import { db } from "./firebase.js";
+  import { doc, getDoc, collection, getDocs, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  let usuarioId = localStorage.getItem("usuarioId");
+  let saldoAtual = 0;
+
+  if (!usuarioId) {
+    window.location.href = "index.html";
+  }
+
+  async function carregarSaldo() {
+    const alunoRef = doc(db, "usuarios", usuarioId);
+    const alunoSnap = await getDoc(alunoRef);
+    if (alunoSnap.exists()) {
+      saldoAtual = alunoSnap.data().saldo || 0;
+      document.getElementById("saldo").innerText = saldoAtual;
+      document.getElementById("nomeAluno").innerText = alunoSnap.data().nome;
+    }
+  }
+
+  async function carregarProdutos() {
+    const querySnapshot = await getDocs(collection(db, "produtos"));
+    const lista = document.getElementById("produtos");
+    lista.innerHTML = "";
+    querySnapshot.forEach((docSnap) => {
+      const produto = docSnap.data();
+      lista.innerHTML += `
+        <div class="card">
+          <span class="emoji">${produto.emoji || "📦"}</span>
+          <h3>${produto.nome}</h3>
+          <p>💲 ${produto.preco}</p>
+          <button onclick="comprarProduto(${produto.preco}, '${produto.nome}')">🛒 Comprar</button>
+        </div>
+      `;
+    });
+  }
+
+  window.comprarProduto = async function(preco, nomeProduto) {
+    if (saldoAtual < preco) {
+      alert("❌ Saldo insuficiente!");
+      return;
+    }
+
+    // Atualiza saldo do aluno
+    const alunoRef = doc(db, "usuarios", usuarioId);
+    await updateDoc(alunoRef, { saldo: saldoAtual - preco });
+
+    // Registra compra no histórico
+    await addDoc(collection(db, "historico"), {
+      alunoId: usuarioId,
+      alunoNome: document.getElementById("nomeAluno").innerText,
+      produto: nomeProduto,
+      preco: preco,
+      data: new Date().toISOString()
+    });
+
+    alert("✅ Compra realizada!");
+    carregarSaldo();
+  };
+
+  carregarSaldo();
+  carregarProdutos();
+</script>
+</head>
+<body>
+  <header>
+    <h1>🛍️ Loja Escolar</h1>
+    <p>👋 Olá, <span id="nomeAluno"></span> | 💰 Saldo: <span id="saldo">0</span></p>
+    <div style="text-align:center; margin-top:0.5rem;">
+      <button onclick="sair()">🚪 Sair</button>
+    </div>
+  </header>
+
+  <script>
+    function sair() {
+      localStorage.removeItem("usuarioId");
+      window.location.href = "index.html";
+    }
+  </script>
+
+  <main>
+    <div id="produtos" class="grid"></div>
+  </main>
+</body>
+</html>
