@@ -5,60 +5,79 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>🔐 Login Loja Escolar</title>
 <link rel="stylesheet" href="style.css"/>
+<style>
+  body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f5f5; }
+  header { background:#1976d2; color:white; padding:20px; text-align:center; }
+  h1 { margin:0; font-size:1.8rem; }
+  main { display:flex; justify-content:center; align-items:center; min-height:80vh; padding:20px; }
+  .card { background:white; padding:30px; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.1); width:100%; max-width:400px; }
+  label { display:block; margin-top:15px; font-weight:bold; }
+  input, select { width:100%; padding:10px; margin-top:5px; border-radius:5px; border:1px solid #ccc; font-size:1rem; }
+  button { margin-top:20px; width:100%; padding:12px; border:none; border-radius:5px; background:#1976d2; color:white; font-size:1rem; cursor:pointer; transition:0.2s; }
+  button:hover { opacity:0.85; }
+</style>
 <script type="module">
   import { db } from "./firebase.js";
   import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  document.getElementById("tipo").addEventListener("change", () => {
-    const tipo = document.getElementById("tipo").value;
-    document.getElementById("senhaDiv").style.display = (tipo === "professor") ? "block" : "none";
-  });
+  // Mostrar ou esconder campo de senha para professor
+  document.addEventListener("DOMContentLoaded", () => {
+    const tipoSelect = document.getElementById("tipo");
+    const senhaDiv = document.getElementById("senhaDiv");
+    const loginForm = document.getElementById("loginForm");
 
-  document.getElementById("loginForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const nome = document.getElementById("nome").value.trim();
-    const senha = document.getElementById("senha").value.trim();
-    const tipo = document.getElementById("tipo").value;
-
-    const usuariosSnapshot = await getDocs(collection(db, "usuarios"));
-    let usuarioEncontrado = null;
-
-    usuariosSnapshot.forEach((doc) => {
-      const user = doc.data();
-      if (user.nome.toLowerCase() === nome.toLowerCase() && user.tipo === tipo) {
-        usuarioEncontrado = { id: doc.id, ...user };
-      }
+    tipoSelect.addEventListener("change", () => {
+      senhaDiv.style.display = (tipoSelect.value === "professor") ? "block" : "none";
     });
 
-    if (!usuarioEncontrado) {
-      alert("❌ Usuário não encontrado!");
-      return;
-    }
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nome = document.getElementById("nome").value.trim();
+      const senha = document.getElementById("senha").value.trim();
+      const tipo = tipoSelect.value;
 
-    if (tipo === "professor" && usuarioEncontrado.senha !== senha) {
-      alert("❌ Senha incorreta!");
-      return;
-    }
+      const usuariosSnapshot = await getDocs(collection(db, "usuarios"));
+      let usuarioEncontrado = null;
 
-    localStorage.setItem("usuarioId", usuarioEncontrado.id);
+      usuariosSnapshot.forEach((doc) => {
+        const user = doc.data();
+        if (user.nome.toLowerCase() === nome.toLowerCase() && user.tipo === tipo) {
+          usuarioEncontrado = { id: doc.id, ...user };
+        }
+      });
 
-    if (tipo === "professor") {
-      window.location.href = "professor.html";
-    } else {
-      window.location.href = "aluno.html";
-    }
+      if (!usuarioEncontrado) {
+        alert("❌ Usuário não encontrado!");
+        return;
+      }
+
+      if (tipo === "professor" && usuarioEncontrado.senha !== senha) {
+        alert("❌ Senha incorreta!");
+        return;
+      }
+
+      localStorage.setItem("usuarioId", usuarioEncontrado.id);
+
+      if (tipo === "professor") {
+        window.location.href = "professor.html";
+      } else {
+        window.location.href = "aluno.html";
+      }
+    });
   });
 </script>
 <link rel="icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
-  <header><h1>🔐 Login Loja Escolar</h1></header>
+  <header>
+    <h1>🔐 Login Loja Escolar</h1>
+  </header>
   <main>
     <form id="loginForm" class="card">
       <label for="tipo">EU SOU:</label>
       <select id="tipo">
-        <option value="aluno">Aluno</option>
-        <option value="professor">Professor</option>
+        <option value="aluno">ALUNO</option>
+        <option value="professor">PROFESSOR</option>
       </select>
 
       <label>NOME:</label>
