@@ -9,184 +9,107 @@
   body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f5f5; }
   header { background:#1976d2; color:white; padding:20px; text-align:center; }
   h1 { margin:0; font-size:1.8rem; }
-  main { padding:20px; max-width:1200px; margin:auto; }
-  .grid { display:flex; flex-wrap:wrap; gap:10px; }
-  .card { background:white; padding:15px; border-radius:10px; width:220px; text-align:center; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
-  button { cursor:pointer; border:none; border-radius:5px; padding:5px 10px; transition:0.2s; }
-  button:hover { opacity:0.85; }
-  .btn-saldo { width:45px; font-weight:bold; }
-  .btn-verde { background-color:#4CAF50; color:white; }
-  .btn-verde-escuro { background-color:#2e7d32; color:white; }
-  .btn-vermelho { background-color:#f44336; color:white; }
-  .btn-vermelho-escuro { background-color:#c62828; color:white; }
+  main { padding:20px; max-width:900px; margin:auto; }
+  .filtros { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+  select, input { padding:8px; border:1px solid #ccc; border-radius:5px; }
+  ul { list-style:none; padding:0; }
+  li { background:white; margin:8px 0; padding:12px; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1); display:flex; justify-content:space-between; align-items:center; }
+  .btn { cursor:pointer; border:none; border-radius:5px; padding:8px 12px; transition:0.2s; }
+  .btn:hover { opacity:0.85; }
   .btn-azul { background-color:#1976d2; color:white; }
-  .flex-center { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; align-items:center; margin-bottom:10px; }
-  /* Modal */
-  .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); justify-content:center; align-items:center; }
-  .modal-content { background:white; padding:20px; border-radius:10px; min-width:300px; text-align:center; }
-  .modal-content input { width:80%; padding:5px; margin:10px 0; }
-  .modal-content button { width:45%; margin:5px; }
+  .btn-verde { background-color:#4CAF50; color:white; }
+  .btn-verde-escuro { background:#2e7d32; color:white; }
+  .btn-vermelho-escuro { background:#c62828; color:white; }
 </style>
 <script type="module">
-  import { db } from "./firebase.js";
-  import { collection, getDocs, updateDoc, doc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { db } from "./firebase.js";
+import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  let usuarioId = localStorage.getItem("usuarioId");
-  if (!usuarioId) window.location.href="index.html";
+let usuarioId = localStorage.getItem("usuarioId");
+if (!usuarioId) window.location.href="index.html";
 
-  // ---------- ALUNOS ----------
-  async function carregarAlunos() {
-    const querySnapshot = await getDocs(collection(db, "usuarios"));
-    const lista = document.getElementById("listaAlunos");
-    lista.innerHTML = "";
-    querySnapshot.forEach((docSnap) => {
-      const aluno = docSnap.data();
-      if (aluno.tipo === "aluno") {
-        lista.innerHTML += `
-          <div class="card">
-            <h3>${aluno.nome} (${aluno.turma})</h3>
-            <p>💰 Saldo: ${aluno.saldo || 0}</p>
-            <div class="flex-center">
-              <button class="btn-saldo btn-verde" onclick="alterarSaldo('${docSnap.id}',1)">+1</button>
-              <button class="btn-saldo btn-vermelho" onclick="alterarSaldo('${docSnap.id}',-1)">-1</button>
-              <button class="btn-saldo btn-verde-escuro" onclick="alterarSaldo('${docSnap.id}',10)">+10</button>
-              <button class="btn-saldo btn-vermelho-escuro" onclick="alterarSaldo('${docSnap.id}',-10)">-10</button>
-            </div>
-          </div>
-        `;
-      }
+// --- FUNÇÃO SAIR ---
+window.sair = function(){
+  localStorage.removeItem("usuarioId");
+  window.location.href="index.html";
+};
+
+const lista = document.getElementById("listaAlunos");
+const turmaSelect = document.getElementById("filtroTurma");
+const buscaInput = document.getElementById("buscaAluno");
+
+let alunos = [];
+
+// --- CARREGAR ALUNOS ---
+async function carregarAlunos() {
+  const snap = await getDocs(collection(db, "usuarios"));
+  alunos = [];
+  snap.forEach(docSnap => {
+    let a = docSnap.data();
+    a.id = docSnap.id;
+    if (a.tipo === "aluno") alunos.push(a);
+  });
+  preencherTurmas();
+  renderizar();
+}
+
+function preencherTurmas() {
+  const turmas = [...new Set(alunos.map(a => a.turma).filter(Boolean))];
+  turmaSelect.innerHTML = `<option value="">Todas</option>`;
+  turmas.forEach(t => {
+    turmaSelect.innerHTML += `<option value="${t}">${t}</option>`;
+  });
+}
+
+function renderizar() {
+  const turmaFiltro = turmaSelect.value;
+  const termo = buscaInput.value.toLowerCase();
+
+  lista.innerHTML = "";
+  alunos
+    .filter(a => !turmaFiltro || a.turma === turmaFiltro)
+    .filter(a => a.nome.toLowerCase().includes(termo))
+    .forEach(aluno => {
+      lista.innerHTML += `
+        <li>
+          <span>👩‍🎓 ${aluno.nome} - ${aluno.turma || "Sem turma"} - 💰 ${aluno.saldo || 0}</span>
+          <button class="btn btn-azul" onclick="abrirAluno('${aluno.id}')">📜 Ver Perfil</button>
+        </li>
+      `;
     });
-  }
+  if (!lista.innerHTML) lista.innerHTML = "<li>Nenhum aluno encontrado.</li>";
+}
 
-  window.alterarSaldo = async function(uid, valor) {
-    const alunoRef = doc(db,"usuarios",uid);
-    const alunosSnap = await getDocs(collection(db,"usuarios"));
-    alunosSnap.forEach(async (u)=>{
-      if(u.id===uid){
-        const atual = u.data().saldo ||0;
-        await updateDoc(alunoRef,{saldo: atual+valor});
-        carregarAlunos();
-      }
-    });
-  };
+window.abrirAluno = function(id) {
+  localStorage.setItem("alunoSelecionado", id);
+  window.location.href = "painel-aluno.html";
+};
 
-  // ---------- HISTÓRICO ----------
-  let usuariosCache={};
+turmaSelect.addEventListener("change", renderizar);
+buscaInput.addEventListener("input", renderizar);
 
-  async function carregarUsuarios(){
-    const usuariosSnap = await getDocs(collection(db,"usuarios"));
-    const selectTurma = document.getElementById("filtroTurma");
-    const turmas = new Set();
-    usuariosSnap.forEach(docSnap=>{
-      const u = docSnap.data();
-      usuariosCache[docSnap.id] = u;
-      if(u.tipo==="aluno" && u.turma) turmas.add(u.turma);
-    });
-    turmas.forEach(t=>{
-      if (![...selectTurma.options].some(opt=>opt.value===t)){
-        selectTurma.innerHTML += `<option value="${t}">${t}</option>`;
-      }
-    });
-  }
-
-  window.carregarHistorico = async function(){
-    const historicoSnap = await getDocs(collection(db,"historico"));
-    const lista = document.getElementById("listaHistorico");
-    lista.innerHTML="";
-    const turmaSelecionada = document.getElementById("filtroTurma").value;
-
-    historicoSnap.forEach(docSnap=>{
-      const compra = docSnap.data();
-      const aluno = usuariosCache[compra.alunoId];
-      if(!aluno) return;
-      if(turmaSelecionada && aluno.turma!==turmaSelecionada) return;
-      const dataFormatada = new Date(compra.data).toLocaleString("pt-BR");
-      lista.innerHTML += `<li>📅 ${dataFormatada} - 👩‍🎓 ${aluno.nome} (${aluno.turma}) - ${compra.produto} - 💲${compra.preco}</li>`;
-    });
-
-    if(lista.innerHTML==="") lista.innerHTML="<li>Nenhuma compra registrada nessa turma.</li>";
-  };
-
-  // ---------- LIMPAR HISTÓRICO MODAL ----------
-  window.abrirModalHistorico = function() {
-    document.getElementById("modalHistorico").style.display="flex";
-  };
-
-  window.fecharModalHistorico = function() {
-    document.getElementById("modalHistorico").style.display="none";
-  };
-
-  window.confirmarLimpezaHistorico = async function(){
-    const senhaDigitada = document.getElementById("senhaHistorico").value.trim();
-    if(!senhaDigitada) return alert("Digite a senha!");
-    const usuarioRef = doc(db,"usuarios",usuarioId);
-    const usuarioSnap = await getDoc(usuarioRef);
-    if(!usuarioSnap.exists()) return alert("Erro: usuário não encontrado.");
-    if(senhaDigitada !== usuarioSnap.data().senha) return alert("Senha incorreta!");
-
-    const historicoSnap = await getDocs(collection(db,"historico"));
-    for(const docSnap of historicoSnap.docs){
-      await deleteDoc(doc(db,"historico",docSnap.id));
-    }
-    alert("✅ Histórico limpo com sucesso!");
-    fecharModalHistorico();
-    carregarHistorico();
-  };
-
-  // ---------- FUNÇÃO SAIR ----------
-  window.sair = function(){
-    localStorage.removeItem("usuarioId");
-    window.location.href="index.html";
-  };
-
-  // ---------- INICIALIZAÇÃO ----------
-  carregarAlunos();
-  await carregarUsuarios();
-  carregarHistorico();
+carregarAlunos();
 </script>
-<link rel="icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
 <header><h1>👨‍🏫 Painel do Professor</h1></header>
-
 <main>
   <!-- Botões principais -->
-  <div class="flex-center" style="margin-bottom:15px;">
-    <button class="btn-azul" onclick="window.location.href='professor-cadastro.html'">➕ Cadastrar Novo Usuário</button>
-    <button class="btn-verde" onclick="window.location.href='professor-produtos.html'">🛒 Cadastrar Produto</button>
-    <button class="btn-verde-escuro" onclick="window.location.href='professor-produtos-gerenciar.html'">🛠️ Gerenciar Produtos</button>
-    <button class="btn-vermelho-escuro" onclick="sair()">🚪 Sair</button>
+  <div class="filtros" style="justify-content:flex-start; flex-wrap:wrap;">
+    <button class="btn btn-azul" onclick="window.location.href='professor-cadastro.html'">➕ Cadastrar Novo Usuário</button>
+    <button class="btn btn-verde" onclick="window.location.href='professor-produtos.html'">🛒 Cadastrar Produto</button>
+    <button class="btn btn-verde-escuro" onclick="window.location.href='professor-produtos-gerenciar.html'">🛠️ Gerenciar Produtos</button>
+    <button class="btn btn-vermelho-escuro" onclick="sair()">🚪 Sair</button>
   </div>
 
-  <!-- Alunos -->
-  <h2>📚 Lista de Alunos</h2>
-  <div id="listaAlunos" class="grid"></div>
-
-  <!-- Histórico -->
-  <h2>📜 Histórico de Compras</h2>
-  <div class="flex-center" style="margin-bottom:10px;">
-    <label for="filtroTurma">Filtrar por turma:</label>
-    <select id="filtroTurma" onchange="carregarHistorico()">
-      <option value="">Todas</option>
-    </select>
-    <button class="btn-azul" onclick="carregarHistorico()">🔄 Atualizar Histórico</button>
-    <button class="btn-vermelho" onclick="abrirModalHistorico()">🧹 Limpar Histórico</button>
+  <!-- Filtros -->
+  <div class="filtros">
+    <select id="filtroTurma"></select>
+    <input type="text" id="buscaAluno" placeholder="Buscar aluno por nome..."/>
   </div>
-  <ul id="listaHistorico"></ul>
+
+  <!-- Lista de alunos -->
+  <ul id="listaAlunos"></ul>
 </main>
-
-<!-- Modal Limpar Histórico -->
-<div id="modalHistorico" class="modal">
-  <div class="modal-content">
-    <h3>Confirmar Limpeza do Histórico</h3>
-    <p>Digite sua senha de professor para confirmar:</p>
-    <input type="password" id="senhaHistorico" placeholder="Senha do professor">
-    <div style="display:flex; justify-content:center; gap:10px;">
-      <button class="btn-verde" onclick="confirmarLimpezaHistorico()">✅ Confirmar</button>
-      <button class="btn-vermelho" onclick="fecharModalHistorico()">❌ Cancelar</button>
-    </div>
-  </div>
-</div>
-
 </body>
 </html>
