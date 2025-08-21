@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Loja do Aluno</title>
+<link rel="stylesheet" href="style.css"/>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin:0;
+    padding:0;
+    background:#f5f5f5;
+  }
+
+  header {
+    background:#1976d2;
+    color:white;
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    padding:10px 20px;
+    flex-wrap: wrap;
+  }
+
+  #alunoInfo {
+    font-size:1.2rem;
+    font-weight:bold;
+  }
+
+  #logoEscola {
+    height:40px;
+  }
+
+  main {
+    display:flex;
+    padding:20px;
+    max-width:1200px;
+    margin:auto;
+    gap:20px;
+  }
+
+  #produtosContainer {
+    flex:3;
+    display:flex;
+    flex-wrap: wrap;
+    gap:15px;
+  }
+
+  .card {
+    background:white;
+    padding:15px;
+    border-radius:10px;
+    width:180px;
+    text-align:center;
+    box-shadow:0 2px 6px rgba(0,0,0,0.1);
+    display:flex;
+    flex-direction: column;
+    align-items:center;
+  }
+
+  .card img {
+    width:80px;
+    height:80px;
+    object-fit: contain;
+    margin-bottom:10px;
+  }
+
+  .card button {
+    margin-top:10px;
+    cursor:pointer;
+    border:none;
+    border-radius:5px;
+    padding:8px 10px;
+    background:#1976d2;
+    color:white;
+    transition:0.2s;
+    width:100%;
+  }
+
+  .card button:hover { opacity:0.85; }
+
+  #carrinhoContainer {
+    flex:1;
+    background:white;
+    border-radius:10px;
+    padding:15px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.1);
+    position:sticky;
+    top:20px;
+    height:max-content;
+  }
+
+  #carrinho ul {
+    list-style:none;
+    padding:0;
+  }
+
+  #carrinho ul li {
+    background:white;
+    padding:8px;
+    border-radius:5px;
+    margin-bottom:5px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    box-shadow:0 1px 3px rgba(0,0,0,0.1);
+  }
+
+  #carrinho ul li button {
+    background:#f44336;
+    color:white;
+    border:none;
+    border-radius:5px;
+    padding:3px 6px;
+    cursor:pointer;
+    transition:0.2s;
+  }
+
+  #carrinho ul li button:hover { opacity:0.85; }
+
+  #finalizar {
+    background:#4CAF50;
+    color:white;
+    border:none;
+    border-radius:5px;
+    padding:10px 15px;
+    cursor:pointer;
+    transition:0.2s;
+    font-size:1rem;
+    margin-top:10px;
+    width:100%;
+  }
+
+  #finalizar:hover { opacity:0.85; }
+
+  .flex-center {
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    justify-content:center;
+    align-items:center;
+    margin-top:10px;
+  }
+
+  .btn-azul { background-color:#1976d2; color:white; border:none; border-radius:5px; padding:8px 12px; cursor:pointer; }
+  .btn-azul:hover { opacity:0.85; }
+
+  .modal { display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; overflow:auto; background:rgba(0,0,0,0.4); }
+  .modal-content { background:white; margin:15% auto; padding:20px; border-radius:10px; width:90%; max-width:400px; text-align:center; box-shadow:0 2px 10px rgba(0,0,0,0.2); }
+  .modal button { width:40%; margin:10px; }
+  .btn-verde { background:#4CAF50; color:white; border:none; border-radius:5px; padding:8px 12px; cursor:pointer; }
+  .btn-verde:hover { opacity:0.85; }
+  .btn-vermelho { background:#f44336; color:white; border:none; border-radius:5px; padding:8px 12px; cursor:pointer; }
+  .btn-vermelho:hover { opacity:0.85; }
+
+  @media (max-width:768px){
+    main { flex-direction: column; }
+    #produtosContainer { justify-content:center; }
+    #carrinhoContainer { position:relative; top:0; width:100%; margin-top:20px; }
+    .card { width:100%; max-width:300px; }
+  }
+
+</style>
+<script type="module">
+import { db } from "./firebase.js";
+import { collection, getDocs, getDoc, doc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+let usuarioId = localStorage.getItem("usuarioId");
+let escolaId = localStorage.getItem("escolaId");
+if(!usuarioId || !escolaId) window.location.href="index.html";
+
+let aluno = {};
+let carrinho = [];
+
+async function mostrarEscola() {
+  const escolaSnap = await getDoc(doc(db, "escolas", escolaId));
+  const logo = document.getElementById("logoEscola");
+  if(escolaSnap.exists()) logo.src = escolaSnap.data().logo || "";
+}
+
+async function carregarAluno() {
+  const docSnap = await getDoc(doc(db, "usuarios", usuarioId));
+  aluno = docSnap.data();
+  document.getElementById("alunoInfo").innerHTML = `👋 ${aluno.nome} | 💰 <strong id="saldo">${aluno.saldo||0}</strong>`;
+}
+
+async function carregarProdutos() {
+  const produtosSnap = await getDocs(collection(db,"produtos"));
+  const lista = document.getElementById("produtosContainer");
+  lista.innerHTML="";
+  produtosSnap.forEach(p=>{
+    const produto = p.data();
+    if(produto.escolaId !== escolaId) return;
+    lista.innerHTML += `
+      <div class="card">
+        <img src="${produto.imagem}" alt="${produto.nome}">
+        <h3>${produto.nome}</h3>
+        <p>💲${produto.preco}</p>
+        <button onclick="adicionarCarrinho('${p.id}','${produto.nome}',${produto.preco},'${produto.imagem}')">🛒 Adicionar</button>
+      </div>
+    `;
+  });
+}
+
+window.adicionarCarrinho = function(id,nome,preco,imagem){
+  const itemExistente = carrinho.find(i=>i.id===id);
+  if(itemExistente) itemExistente.qtd += 1;
+  else carrinho.push({id,nome,preco,imagem,qtd:1});
+  atualizarCarrinho();
+};
+
+function atualizarCarrinho(){
+  const lista = document.getElementById("carrinho");
+  lista.innerHTML="";
+  let total=0;
+  carrinho.forEach((item,index)=>{
+    total += item.preco*item.qtd;
+    lista.innerHTML += `<li><img src="${item.imagem}" width="30" height="30" style="margin-right:5px;"> ${item.nome} x${item.qtd} - 💲${item.preco*item.qtd} <button onclick="removerCarrinho(${index})">❌</button></li>`;
+  });
+  document.getElementById("total").innerText = total;
+}
+
+window.removerCarrinho = function(index){ carrinho.splice(index,1); atualizarCarrinho(); }
+
+function mostrarModal() { if(carrinho.length===0){alert("Carrinho vazio"); return;} document.getElementById("modal").style.display="block"; }
+function fecharModal(){ document.getElementById("modal").style.display="none"; }
+
+async function confirmarCompra(){
+  const total = carrinho.reduce((acc,i)=>acc+i.preco*i.qtd,0);
+  if(total>aluno.saldo){ alert("Saldo insuficiente"); fecharModal(); return; }
+  
+  aluno.saldo -= total;
+  await updateDoc(doc(db,"usuarios",usuarioId),{saldo:aluno.saldo});
+  document.getElementById("saldo").innerText = aluno.saldo;
+
+  // Salvar histórico considerando a quantidade
+  if(carrinho.length === 0) return;
+
+const compra = {
+  alunoId: usuarioId,
+  alunoNome: aluno.nome,
+  escolaId: escolaId, 
+  data: new Date().toISOString(),
+  produtos: carrinho.map(item => ({
+    nome: item.nome,
+    preco: item.preco,
+    qtd: item.qtd
+  }))
+};
+
+
+await addDoc(collection(db,"historico"), compra);
+
+  carrinho=[];
+  atualizarCarrinho();
+  fecharModal();
+  alert("Compra realizada!");
+}
+
+
+window.voltarPainel = function(){ window.location.href="login.html"; }
+
+window.mostrarModal = mostrarModal;
+window.fecharModal = fecharModal;
+window.confirmarCompra = confirmarCompra;
+
+mostrarEscola();
+carregarAluno();
+carregarProdutos();
+</script>
+</head>
+<body>
+<header>
+  <img id="logoEscola" src="" alt="Logo Escola">
+  <div id="alunoInfo"></div>
+  <button class="btn-azul" onclick="voltarPainel()">⬅️ Sair</button>
+</header>
+
+<main>
+  <div id="produtosContainer"></div>
+
+  <div id="carrinhoContainer">
+    <h2>Carrinho</h2>
+    <ul id="carrinho"></ul>
+    <p><strong>Total: 💲<span id="total">0</span></strong></p>
+    <button id="finalizar" onclick="mostrarModal()">✅ Finalizar Compra</button>
+  </div>
+</main>
+
+<div id="modal" class="modal">
+  <div class="modal-content">
+    <p>Tem certeza que deseja finalizar a compra?</p>
+    <div class="flex-center">
+      <button class="btn-verde" onclick="confirmarCompra()">✅ Sim</button>
+      <button class="btn-vermelho" onclick="fecharModal()">❌ Não</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
