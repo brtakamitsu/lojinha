@@ -27,7 +27,7 @@
 </style>
 <script type="module">
 import { db } from "./firebase.js";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, deleteDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 let alunoId = localStorage.getItem("alunoSelecionado");
 if(!alunoId) { alert("Aluno não selecionado."); window.location.href="professor.html"; }
@@ -66,18 +66,44 @@ window.salvarAlteracoes = async function() {
 
 window.mostrarHistorico = async function() {
   historicoLista.innerHTML = "";
-  const q = query(collection(db,"historico"), where("alunoId","==",alunoId));
-  const snap = await getDocs(q);
+const q = query(collection(db,"historico"), where("alunoId","==",alunoId));
+const snap = await getDocs(q);
+
+if(snap.empty) {
+  historicoLista.innerHTML = "<li>Nenhum registro encontrado.</li>";
+  return;
+}
+
+snap.forEach(docSnap => {
+  const h = docSnap.data();
+  const produtos = h.produtos.map(p => `${p.nome} x${p.qtd} - 💲${p.preco}`).join(", ");
+  historicoLista.innerHTML += `
+    <li>${new Date(h.data).toLocaleString()} - ${produtos}</li>
+  `;
+});
+
+
   if(snap.empty) {
     historicoLista.innerHTML = "<li>Nenhum registro encontrado.</li>";
     return;
   }
-  snap.forEach(docSnap=>{
+
+  snap.forEach(docSnap => {
     const h = docSnap.data();
     const classe = h.produto ? "compra" : "";
-    historicoLista.innerHTML += `<li class="${classe}">${h.data ? new Date(h.data).toLocaleString() : ""} - ${h.produto || "Atualização de saldo"} - 💲${h.preco || 0}</li>`;
+    
+    // Exibir quantidade corretamente
+    const qtd = h.qtd || 1; // caso não exista, assume 1
+    const preco = h.preco || 0;
+
+    historicoLista.innerHTML += `
+      <li class="${classe}">
+        ${h.data ? new Date(h.data).toLocaleString() : ""} - ${produtoNome} x${qtd} - 💲${preco}
+      </li>
+    `;
   });
 };
+
 
 window.limparHistorico = async function() {
   if(!confirm("Tem certeza que deseja limpar todo o histórico deste aluno?")) return;
@@ -95,27 +121,23 @@ window.excluirAluno = async function() {
   const senha = prompt("Digite sua senha de professor para confirmar:");
   if(!senha) return;
 
-  // Buscar professor no Firestore
   const professorSnap = await getDoc(doc(db, "usuarios", professorId));
   if(!professorSnap.exists() || professorSnap.data().tipo !== "professor") {
     alert("Erro: professor não encontrado.");
     return;
   }
 
-  // Verificar senha
   if(professorSnap.data().senha !== senha) {
     alert("Senha incorreta. Operação cancelada.");
     return;
   }
 
-  // Confirmação final
   if(!confirm("Tem certeza que deseja excluir este aluno permanentemente?")) return;
 
   await deleteDoc(doc(db,"usuarios",alunoId));
   alert("Aluno excluído com sucesso!");
   window.location.href="professor.html";
 };
-
 
 window.voltar = function() { window.location.href="professor.html"; };
 
