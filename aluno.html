@@ -3,154 +3,196 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>👩‍🎓 Painel do Aluno</title>
+<title>🛒 Loja do Aluno</title>
 <link rel="stylesheet" href="style.css"/>
 <style>
   body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f5f5; }
   header { background:#1976d2; color:white; padding:20px; text-align:center; }
-  h1 { margin:0; font-size:1.8rem; }
-  main { padding:20px; max-width:900px; margin:auto; }
-  .info, .form-edicao, .historico-container { background:white; padding:15px; border-radius:10px; margin-bottom:15px; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
-  label { display:block; margin-top:10px; font-weight:bold; }
-  input { width:100%; padding:8px; margin-top:5px; border:1px solid #ccc; border-radius:5px; }
-  .btn { cursor:pointer; border:none; border-radius:5px; padding:8px 12px; transition:0.2s; margin-top:10px; }
-  .btn:hover { opacity:0.85; }
-  .btn-azul { background-color:#1976d2; color:white; }
-  .btn-verde { background-color:#4CAF50; color:white; }
-  .btn-verde-escuro { background:#2e7d32; color:white; }
-  .btn-vermelho { background:#f44336; color:white; }
-  .btn-vermelho-escuro { background:#c62828; color:white; }
-  .historico-container { max-height:250px; overflow-y:auto; }
-  ul { list-style:none; padding:0; margin:0; }
-  li { background:#f1f8ff; padding:8px; border-radius:5px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; }
-  li.compra { background:#e8f5e9; }
+  h1 { margin:0; font-size:1.8rem; display:flex; justify-content:center; align-items:center; gap:10px; }
+  #logoEscola { height:40px; }
+  #nomeEscola { font-size:1.1rem; margin-top:5px; color:#fff; }
+  #alunoInfo { margin-top:10px; font-size:1rem; }
+  main { padding:20px; max-width:1000px; margin:auto; }
+  h2 { margin-top:20px; }
+  .grid { display:flex; flex-wrap:wrap; gap:10px; }
+  .card { background:white; padding:15px; border-radius:10px; width:180px; text-align:center; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+  .card button { margin-top:10px; cursor:pointer; border:none; border-radius:5px; padding:8px 10px; background:#1976d2; color:white; transition:0.2s; width:100%; }
+  .card button:hover { opacity:0.85; }
+  ul { list-style:none; padding:0; }
+  ul li { background:white; padding:8px; border-radius:5px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
+  ul li button { background:#f44336; color:white; border:none; border-radius:5px; padding:3px 6px; cursor:pointer; transition:0.2s; }
+  ul li button:hover { opacity:0.85; }
+  #finalizar { background:#4CAF50; color:white; border:none; border-radius:5px; padding:10px 15px; cursor:pointer; transition:0.2s; font-size:1rem; margin-top:10px; width:100%; }
+  #finalizar:hover { opacity:0.85; }
+  .flex-center { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; align-items:center; margin-top:10px; }
+  .btn-azul { background-color:#1976d2; color:white; border:none; border-radius:5px; padding:8px 12px; cursor:pointer; transition:0.2s; }
+  .btn-azul:hover { opacity:0.85; }
+
+  /* Modal */
+  .modal { display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; overflow:auto; background:rgba(0,0,0,0.4); }
+  .modal-content { background:white; margin:15% auto; padding:20px; border-radius:10px; width:90%; max-width:400px; text-align:center; box-shadow:0 2px 10px rgba(0,0,0,0.2); }
+  .modal button { width:40%; margin:10px; }
+  .btn-verde { background:#4CAF50; color:white; border:none; border-radius:5px; padding:8px 12px; cursor:pointer; }
+  .btn-verde:hover { opacity:0.85; }
+  .btn-vermelho { background:#f44336; color:white; border:none; border-radius:5px; padding:8px 12px; cursor:pointer; }
+  .btn-vermelho:hover { opacity:0.85; }
 </style>
 <script type="module">
 import { db } from "./firebase.js";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, getDocs, getDoc, doc, updateDoc, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-let alunoId = localStorage.getItem("alunoSelecionado");
-if(!alunoId) { alert("Aluno não selecionado."); window.location.href="professor.html"; }
+let usuarioId = localStorage.getItem("usuarioId");
+let escolaId = localStorage.getItem("escolaId");
+if (!usuarioId || !escolaId) window.location.href="index.html";
 
 let aluno = {};
+let carrinho = [];
 
-const nomeInput = document.getElementById("nomeAluno");
-const senhaInput = document.getElementById("senhaAluno");
-const turmaInput = document.getElementById("turmaAluno");
-const saldoInput = document.getElementById("saldoAluno");
-const historicoLista = document.getElementById("historicoLista");
-
-async function carregarAluno() {
-  const snap = await getDoc(doc(db,"usuarios",alunoId));
-  if(!snap.exists()) { alert("Aluno não encontrado"); window.location.href="professor.html"; }
-  aluno = snap.data();
-  document.getElementById("alunoInfo").innerHTML = `👋 ${aluno.nome} | 💰 Saldo: ${aluno.saldo || 0}`;
-  nomeInput.value = aluno.nome || "";
-  senhaInput.value = aluno.senha || "";
-  turmaInput.value = aluno.turma || "";
-  saldoInput.value = aluno.saldo || 0;
+// --- MOSTRAR NOME E LOGO DA ESCOLA ---
+async function mostrarEscola() {
+  const escolaRef = doc(db, "escolas", escolaId);
+  const escolaSnap = await getDoc(escolaRef);
+  const nomeEscola = document.getElementById("nomeEscola");
+  const logo = document.getElementById("logoEscola");
+  if (escolaSnap.exists()) {
+    nomeEscola.innerText = escolaSnap.data().nome;
+    logo.src = escolaSnap.data().logo || "";
+  } else {
+    nomeEscola.innerText = "Escola não encontrada";
+  }
 }
 
-window.salvarAlteracoes = async function() {
-  if(!confirm("Confirma as alterações deste aluno?")) return;
+// --- CARREGAR DADOS DO ALUNO ---
+async function carregarAluno() {
+  const docSnap = await getDoc(doc(db, "usuarios", usuarioId));
+  aluno = docSnap.data();
+  document.getElementById("alunoInfo").innerHTML = `👋 Olá, ${aluno.nome} | 💰 Saldo: <strong id="saldo">${aluno.saldo || 0}</strong>`;
+}
 
-  await updateDoc(doc(db,"usuarios",alunoId),{
-    nome: nomeInput.value,
-    senha: senhaInput.value,
-    turma: turmaInput.value,
-    saldo: Number(saldoInput.value)
+async function carregarProdutos() {
+  const querySnapshot = await getDocs(collection(db,"produtos"));
+  const lista = document.getElementById("listaProdutos");
+  lista.innerHTML="";
+
+  querySnapshot.forEach((docSnap)=>{
+    const produto = docSnap.data();
+
+    // Mostrar somente produtos da escola e da turma do aluno
+    if(produto.escolaId !== escolaId) return;
+    if(produto.turmas && !produto.turmas.includes(aluno.turma)) return;
+
+    lista.innerHTML += `
+      <div class="card">
+        <img src="${produto.imagem}" alt="${produto.nome}" style="width:80px; height:80px; object-fit:cover; margin-bottom:10px;">
+        <h3>${produto.nome}</h3>
+        <p>💲${produto.preco}</p>
+        <button onclick="adicionarCarrinho('${docSnap.id}','${produto.nome}',${produto.preco},'')">🛒 Adicionar</button>
+      </div>
+    `;
   });
-  alert("Alterações salvas com sucesso!");
-  carregarAluno();
+}
+
+
+window.adicionarCarrinho = function(id,nome,preco,emoji){
+  carrinho.push({id,nome,preco,emoji});
+  atualizarCarrinho();
 };
 
-window.mostrarHistorico = async function() {
-  historicoLista.innerHTML = "";
-  const q = query(collection(db,"historico"), where("alunoId","==",alunoId));
-  const snap = await getDocs(q);
-  if(snap.empty) {
-    historicoLista.innerHTML = "<li>Nenhum registro encontrado.</li>";
-    return;
-  }
-  snap.forEach(docSnap=>{
-    const h = docSnap.data();
-    const classe = h.produto ? "compra" : "";
-    historicoLista.innerHTML += `<li class="${classe}">${h.data ? new Date(h.data).toLocaleString() : ""} - ${h.produto || "Atualização de saldo"} - 💲${h.preco || 0}</li>`;
+function atualizarCarrinho(){
+  const lista = document.getElementById("carrinho");
+  lista.innerHTML="";
+  let total=0;
+  carrinho.forEach((item,index)=>{
+    total += item.preco;
+    lista.innerHTML += `<li>${item.emoji} ${item.nome} - 💲${item.preco} <button onclick="removerCarrinho(${index})">❌</button></li>`;
   });
-};
+  document.getElementById("total").innerText = total;
+}
 
-window.limparHistorico = async function() {
-  if(!confirm("Tem certeza que deseja limpar todo o histórico deste aluno?")) return;
-  const q = query(collection(db,"historico"), where("alunoId","==",alunoId));
-  const snap = await getDocs(q);
-  snap.forEach(async docSnap => {
-    await deleteDoc(doc(db,"historico",docSnap.id));
-  });
-  alert("Histórico limpo com sucesso!");
-  historicoLista.innerHTML = "";
-};
+window.removerCarrinho = function(index){
+  carrinho.splice(index,1);
+  atualizarCarrinho();
+}
 
-window.excluirAluno = async function() {
-  const professorId = localStorage.getItem("usuarioId"); // professor logado
-  const senha = prompt("Digite sua senha de professor para confirmar:");
-  if(!senha) return;
+function mostrarModal() {
+  if(carrinho.length === 0){ alert("O carrinho está vazio!"); return; }
+  document.getElementById("modal").style.display = "block";
+}
 
-  // Buscar professor no Firestore
-  const professorSnap = await getDoc(doc(db, "usuarios", professorId));
-  if(!professorSnap.exists() || professorSnap.data().tipo !== "professor") {
-    alert("Erro: professor não encontrado.");
-    return;
+function fecharModal() {
+  document.getElementById("modal").style.display = "none";
+}
+
+async function confirmarCompra() {
+  let total = carrinho.reduce((acc,item)=>acc+item.preco,0);
+  if(total > aluno.saldo){ alert("Saldo insuficiente!"); fecharModal(); return; }
+
+  const novoSaldo = aluno.saldo - total;
+  await updateDoc(doc(db,"usuarios",usuarioId),{saldo:novoSaldo});
+  aluno.saldo = novoSaldo;
+  document.getElementById("saldo").innerText = novoSaldo;
+
+  for(const item of carrinho){
+    await addDoc(collection(db,"historico"),{
+  alunoId: usuarioId,
+  alunoNome: aluno.nome,
+  produto: item.nome,
+  preco: item.preco,
+  data: new Date().toISOString(),
+  escolaId: escolaId   // <- adicionado
+});
   }
 
-  // Verificar senha
-  if(professorSnap.data().senha !== senha) {
-    alert("Senha incorreta. Operação cancelada.");
-    return;
-  }
+  carrinho = [];
+  atualizarCarrinho();
+  fecharModal();
+  alert("Compra realizada com sucesso!");
+}
 
-  // Confirmação final
-  if(!confirm("Tem certeza que deseja excluir este aluno permanentemente?")) return;
-
-  await deleteDoc(doc(db,"usuarios",alunoId));
-  alert("Aluno excluído com sucesso!");
-  window.location.href="professor.html";
+window.voltarPainel = function(){
+  window.location.href="login.html";
 };
 
+// tornar funções acessíveis no HTML
+window.mostrarModal = mostrarModal;
+window.fecharModal = fecharModal;
+window.confirmarCompra = confirmarCompra;
 
-window.voltar = function() { window.location.href="professor.html"; };
-
+mostrarEscola();
 carregarAluno();
+carregarProdutos();
 </script>
+<link rel="icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
 <header>
-  <h1>👩‍🎓 Painel do Aluno</h1>
+  <h1><img id="logoEscola" src="" alt="Logo Escola">🛒 Loja do Aluno</h1>
+  <p id="nomeEscola">Carregando escola...</p>
+  <div class="flex-center">
+    <button class="btn-azul" onclick="voltarPainel()">⬅️ Sair da Loja</button>
+  </div>
+  <div id="alunoInfo"></div>
 </header>
+
 <main>
-  <div class="info" id="alunoInfo"></div>
+  <h2>Produtos</h2>
+  <div id="listaProdutos" class="grid"></div>
 
-  <div class="form-edicao">
-    <label>Nome:</label>
-    <input type="text" id="nomeAluno">
-    <label>Senha:</label>
-    <input type="text" id="senhaAluno">
-    <label>Turma:</label>
-    <input type="text" id="turmaAluno">
-    <label>Saldo:</label>
-    <input type="number" id="saldoAluno">
+  <h2>Carrinho</h2>
+  <ul id="carrinho"></ul>
+  <p><strong>Total: 💲<span id="total">0</span></strong></p>
+  <button id="finalizar" onclick="mostrarModal()">✅ Finalizar Compra</button>
+</main>
 
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
-      <button class="btn btn-verde" onclick="salvarAlteracoes()">💾 Salvar Alterações</button>
-      <button class="btn btn-azul" onclick="mostrarHistorico()">📜 Ver Histórico</button>
-      <button class="btn btn-vermelho-escuro" onclick="limparHistorico()">🗑️ Limpar Histórico</button>
-      <button class="btn btn-vermelho" onclick="excluirAluno()">❌ Excluir Aluno</button>
-      <button class="btn btn-azul" onclick="voltar()">⬅️ Voltar</button>
+<!-- Modal de Confirmação -->
+<div id="modal" class="modal">
+  <div class="modal-content">
+    <p>Tem certeza que deseja finalizar a compra?</p>
+    <div class="flex-center">
+      <button class="btn-verde" onclick="confirmarCompra()">✅ Sim</button>
+      <button class="btn-vermelho" onclick="fecharModal()">❌ Não</button>
     </div>
   </div>
-
-  <div class="historico-container">
-    <ul class="historico" id="historicoLista"></ul>
-  </div>
-</main>
+</div>
 </body>
 </html>
