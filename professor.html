@@ -7,8 +7,8 @@
 <link rel="stylesheet" href="style.css"/>
 <style>
   body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f5f5; }
-  header { background:#1976d2; color:white; padding:20px; text-align:center; }
-  h1 { margin:0; font-size:1.8rem; }
+  header { background:#1976d2; color:white; padding:20px; display:flex; align-items:center; justify-content:center; gap:10px; }
+  h1 { margin:0; font-size:1.8rem; display:flex; align-items:center; gap:10px; }
   main { padding:20px; max-width:900px; margin:auto; }
   .filtros { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
   select, input { padding:8px; border:1px solid #ccc; border-radius:5px; }
@@ -20,19 +20,37 @@
   .btn-verde { background-color:#4CAF50; color:white; }
   .btn-verde-escuro { background:#2e7d32; color:white; }
   .btn-vermelho-escuro { background:#c62828; color:white; }
+  #logoEscola { width:40px; height:40px; object-fit:contain; border-radius:5px; }
 </style>
 <script type="module">
 import { db } from "./firebase.js";
-import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { collection, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 let usuarioId = localStorage.getItem("usuarioId");
-if (!usuarioId) window.location.href="index.html";
+const escolaId = localStorage.getItem("escolaId");
+if (!usuarioId || !escolaId) window.location.href="login.html";
 
 // --- FUNÇÃO SAIR ---
 window.sair = function(){
   localStorage.removeItem("usuarioId");
-  window.location.href="index.html";
+  localStorage.removeItem("escolaId");
+  window.location.href="login.html";
 };
+
+// --- MOSTRAR NOME E LOGO DA ESCOLA ---
+async function mostrarEscola() {
+  const escolaRef = doc(db, "escolas", escolaId);
+  const escolaSnap = await getDoc(escolaRef);
+  const nomeEscola = document.getElementById("nomeEscola");
+  const logoEscola = document.getElementById("logoEscola");
+  if (escolaSnap.exists()) {
+    const data = escolaSnap.data();
+    logoEscola.src = data.logo || "";
+  } else {
+    nomeEscola.innerText = "Escola não encontrada";
+  }
+}
+mostrarEscola();
 
 const lista = document.getElementById("listaAlunos");
 const turmaSelect = document.getElementById("filtroTurma");
@@ -47,7 +65,7 @@ async function carregarAlunos() {
   snap.forEach(docSnap => {
     let a = docSnap.data();
     a.id = docSnap.id;
-    if (a.tipo === "aluno") alunos.push(a);
+    if (a.tipo === "aluno" && a.escolaId === escolaId) alunos.push(a);
   });
   preencherTurmas();
   renderizar();
@@ -55,7 +73,7 @@ async function carregarAlunos() {
 
 function preencherTurmas() {
   const turmas = [...new Set(alunos.map(a => a.turma).filter(Boolean))];
-  turmaSelect.innerHTML = `<option value="">Todas</option>`;
+  turmaSelect.innerHTML = `<option value="">Turma</option>`;
   turmas.forEach(t => {
     turmaSelect.innerHTML += `<option value="${t}">${t}</option>`;
   });
@@ -92,7 +110,11 @@ carregarAlunos();
 </script>
 </head>
 <body>
-<header><h1>👨‍🏫 Painel do Professor</h1></header>
+<header>
+  <img id="logoEscola" src="" alt="Logo da Escola">
+  <h1> Painel do Professor</h1>
+  <p id="nomeEscola" style="font-size:1.1rem; margin-top:5px; color:#fff;"></p>
+</header>
 <main>
   <!-- Botões principais -->
   <div class="filtros" style="justify-content:flex-start; flex-wrap:wrap;">
