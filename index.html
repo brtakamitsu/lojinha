@@ -3,93 +3,131 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>🔐 Login Loja Escolar</title>
+<title>Escolha sua Escola</title>
 <link rel="stylesheet" href="style.css"/>
 <style>
-  body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f5f5; }
-  header { background:#1976d2; color:white; padding:20px; text-align:center; }
-  h1 { margin:0; font-size:1.8rem; }
-  main { display:flex; justify-content:center; align-items:center; min-height:80vh; padding:20px; }
-  .card { background:white; padding:30px; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.1); width:100%; max-width:400px; }
-  label { display:block; margin-top:15px; font-weight:bold; }
-  input, select { width:100%; padding:10px; margin-top:5px; border-radius:5px; border:1px solid #ccc; font-size:1rem; }
-  button { margin-top:20px; width:100%; padding:12px; border:none; border-radius:5px; background:#1976d2; color:white; font-size:1rem; cursor:pointer; transition:0.2s; }
-  button:hover { opacity:0.85; }
+  body {
+    font-family: 'Inter', Arial, sans-serif;
+    margin:0;
+    padding:0;
+    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    flex-direction:column;
+    min-height:100vh;
+    transition: background 0.5s;
+  }
+
+  h1 {
+    color:#0d47a1;
+    margin-bottom:40px;
+    font-size:2.2rem;
+    font-weight:700;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .escolas-container {
+    display:flex;
+    flex-wrap:wrap;
+    gap:25px;
+    justify-content:center;
+  }
+
+  .escola-card {
+    background:white;
+    padding:20px;
+    border-radius:15px;
+    box-shadow:0 8px 20px rgba(0,0,0,0.08);
+    width:160px;
+    height:160px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    cursor:pointer;
+    transition: transform 0.3s, box-shadow 0.3s;
+    text-align:center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .escola-card::before {
+    content:"";
+    position:absolute;
+    top:0; left:0; width:100%; height:100%;
+    background: rgba(13,71,161,0.05);
+    transform: scale(0);
+    transition: transform 0.4s ease;
+    border-radius:15px;
+  }
+
+  .escola-card:hover::before {
+    transform: scale(1.5);
+  }
+
+  .escola-card:hover {
+    transform: translateY(-8px);
+    box-shadow:0 14px 30px rgba(0,0,0,0.2);
+  }
+
+  .escola-card img {
+    max-width:90px;
+    max-height:90px;
+    margin-bottom:12px;
+    border-radius:12px;
+    object-fit:contain;
+    transition: transform 0.3s;
+  }
+
+  .escola-card:hover img {
+    transform: scale(1.1);
+  }
+
+  .escola-card span {
+    font-weight:600;
+    color:#0d47a1;
+    font-size:1rem;
+    transition: color 0.3s;
+  }
+
+  .escola-card:hover span {
+    color:#1565c0;
+  }
+
+  @media(max-width:500px){
+    .escola-card { width:130px; height:130px; }
+    .escola-card img { max-width:70px; max-height:70px; }
+  }
 </style>
 <script type="module">
-  import { db } from "./firebase.js";
-  import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { db } from "./firebase.js";
+import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  // Mostrar ou esconder campo de senha para professor
-  document.addEventListener("DOMContentLoaded", () => {
-    const tipoSelect = document.getElementById("tipo");
-    const senhaDiv = document.getElementById("senhaDiv");
-    const loginForm = document.getElementById("loginForm");
+document.addEventListener("DOMContentLoaded", async () => {
+  const container = document.getElementById("escolasContainer");
+  const escolasSnap = await getDocs(collection(db,"escolas"));
 
-    tipoSelect.addEventListener("change", () => {
-      senhaDiv.style.display = (tipoSelect.value === "professor") ? "block" : "none";
+  escolasSnap.forEach(docSnap => {
+    const escola = docSnap.data();
+    const card = document.createElement("div");
+    card.classList.add("escola-card");
+    card.innerHTML = `
+      <img src="${escola.logo}" alt="${escola.nome}">
+      <span>${escola.nome}</span>
+    `;
+    card.addEventListener("click", () => {
+      localStorage.setItem("escolaId", docSnap.id);
+      localStorage.setItem("escolaLogo", escola.logo);
+      window.location.href = "login.html";
     });
-
-    loginForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const nome = document.getElementById("nome").value.trim();
-      const senha = document.getElementById("senha").value.trim();
-      const tipo = tipoSelect.value;
-
-      const usuariosSnapshot = await getDocs(collection(db, "usuarios"));
-      let usuarioEncontrado = null;
-
-      usuariosSnapshot.forEach((doc) => {
-        const user = doc.data();
-        if (user.nome.toLowerCase() === nome.toLowerCase() && user.tipo === tipo) {
-          usuarioEncontrado = { id: doc.id, ...user };
-        }
-      });
-
-      if (!usuarioEncontrado) {
-        alert("❌ Usuário não encontrado!");
-        return;
-      }
-
-      if (tipo === "professor" && usuarioEncontrado.senha !== senha) {
-        alert("❌ Senha incorreta!");
-        return;
-      }
-
-      localStorage.setItem("usuarioId", usuarioEncontrado.id);
-
-      if (tipo === "professor") {
-        window.location.href = "professor.html";
-      } else {
-        window.location.href = "aluno.html";
-      }
-    });
+    container.appendChild(card);
   });
+});
 </script>
-<link rel="icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
-  <header>
-    <h1>🔐 Login Loja Escolar</h1>
-  </header>
-  <main>
-    <form id="loginForm" class="card">
-      <label for="tipo">EU SOU:</label>
-      <select id="tipo">
-        <option value="aluno">ALUNO</option>
-        <option value="professor">PROFESSOR</option>
-      </select>
-
-      <label>NOME:</label>
-      <input type="text" id="nome" required>
-
-      <div id="senhaDiv" style="display:none;">
-        <label>SENHA:</label>
-        <input type="password" id="senha">
-      </div>
-
-      <button type="submit">Entrar</button>
-    </form>
-  </main>
+  <h1>Escolha sua Escola</h1>
+  <div id="escolasContainer" class="escolas-container"></div>
 </body>
 </html>
