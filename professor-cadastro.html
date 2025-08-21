@@ -3,71 +3,68 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>➕ Cadastro de Usuários</title>
+<title>➕ Cadastrar Usuário</title>
 <link rel="stylesheet" href="style.css"/>
 <style>
-  body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f5f5; }
+  body { font-family: Arial, sans-serif; margin:0; padding:0; background:#e3f2fd; }
   header { background:#1976d2; color:white; padding:20px; text-align:center; }
   h1 { margin:0; font-size:1.8rem; }
-  main { padding:20px; max-width:500px; margin:auto; }
-  .card { background:white; padding:20px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
-  label { display:block; margin-top:10px; font-weight:bold; }
-  input, select { width:100%; padding:8px; margin-top:5px; border-radius:5px; border:1px solid #ccc; box-sizing:border-box; }
-  button { cursor:pointer; border:none; border-radius:5px; padding:10px 15px; margin-top:15px; transition:0.2s; width:100%; font-size:1rem; }
-  button:hover { opacity:0.85; }
-  .btn-azul { background-color:#1976d2; color:white; }
-  .btn-verde { background-color:#4CAF50; color:white; }
-  .flex-center { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-bottom:10px; }
+  main { display:flex; justify-content:center; align-items:center; min-height:80vh; padding:20px; }
+  .card { background:white; padding:30px; border-radius:10px; box-shadow:0 4px 12px rgba(0,0,0,0.1); width:100%; max-width:400px; }
+  label { display:block; margin-top:15px; font-weight:bold; }
+  input, select { width:100%; padding:10px; margin-top:5px; border-radius:5px; border:1px solid #ccc; font-size:1rem; }
+  .btn { margin-top:20px; width:100%; padding:12px; border:none; border-radius:5px; font-size:1rem; cursor:pointer; transition:0.2s; }
+  .btn-azul { background:#1976d2; color:white; }
+  .btn-verde { background:#4caf50; color:white; }
+  .btn:hover { opacity:0.85; }
+  .flex { display:flex; gap:10px; justify-content:space-between; flex-wrap:wrap; margin-top:20px; }
+  .flex button { flex:1; }
 </style>
 <script type="module">
-  import { db } from "./firebase.js";
-  import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { db } from "./firebase.js";
+import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  let usuarioId = localStorage.getItem("usuarioId");
-  if(!usuarioId) window.location.href="index.html";
+const form = document.getElementById("cadastroForm");
+const professorId = localStorage.getItem("usuarioId");
+const escolaId = localStorage.getItem("escolaId");
 
-  window.addEventListener("DOMContentLoaded", () => {
-    const form = document.getElementById("cadastroForm");
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const tipo = document.getElementById("tipo").value;
-      const nome = document.getElementById("nome").value.trim();
-      const turma = document.getElementById("turma").value.trim();
-      const saldo = parseInt(document.getElementById("saldo").value) || 0;
-      const senha = document.getElementById("senha").value.trim();
+if(!professorId || !escolaId) {
+  alert("Erro: professor não encontrado.");
+  window.location.href="index.html";
+}
 
-      let dados = { nome, tipo };
-      if(tipo==="aluno"){ dados.turma=turma; dados.saldo=saldo; } 
-      else { dados.senha = senha; }
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const nome = document.getElementById("nome").value.trim();
+  const senha = document.getElementById("senha").value.trim();
+  const tipo = document.getElementById("tipo").value;
+  const turma = document.getElementById("turma").value.trim();
+  const saldo = parseFloat(document.getElementById("saldo").value) || 0;
 
-      await addDoc(collection(db,"usuarios"),dados);
-      alert("✅ Usuário cadastrado com sucesso!");
-      e.target.reset();
-    });
+  if(!nome || !senha || !tipo) {
+    alert("Por favor, preencha todos os campos obrigatórios.");
+    return;
+  }
 
-    document.getElementById("tipo").addEventListener("change", ()=>{
-      const tipo = document.getElementById("tipo").value;
-      document.getElementById("alunoExtra").style.display = (tipo==="aluno") ? "block" : "none";
-      document.getElementById("professorExtra").style.display = (tipo==="professor") ? "block" : "none";
-    });
+  await addDoc(collection(db, "usuarios"), {
+    nome,
+    senha,
+    tipo,
+    turma: tipo === "aluno" ? turma : "",
+    saldo: tipo === "aluno" ? saldo : 0,
+    escolaId
   });
 
-  window.voltarPainel = function(){
-    window.location.href="professor.html";
-  };
+  alert(`${tipo === "aluno" ? "Aluno" : "Professor"} cadastrado com sucesso!`);
+  form.reset();
+});
 </script>
 </head>
 <body>
-<header>
-  <h1>➕ Cadastro de Usuários</h1>
-  <div class="flex-center" style="margin-top:10px;">
-    <button class="btn-azul" onclick="voltarPainel()">⬅️ Voltar ao Painel</button>
-  </div>
-</header>
-
+<header><h1>➕ Cadastrar Usuário</h1></header>
 <main>
   <form id="cadastroForm" class="card">
-    <label for="tipo">Tipo de usuário:</label>
+    <label>Tipo de Usuário:</label>
     <select id="tipo">
       <option value="aluno">Aluno</option>
       <option value="professor">Professor</option>
@@ -76,21 +73,20 @@
     <label>Nome:</label>
     <input type="text" id="nome" required>
 
-    <div id="alunoExtra">
-      <label>Turma:</label>
-      <input type="text" id="turma">
-      <label>Saldo Inicial:</label>
-      <input type="number" id="saldo" value="0">
-    </div>
+    <label>Senha:</label>
+    <input type="password" id="senha" required>
 
-    <div id="professorExtra" style="display:none;">
-      <label>Senha:</label>
-      <input type="password" id="senha">
-    </div>
+    <label>Turma (somente alunos):</label>
+    <input type="text" id="turma">
 
-    <button type="submit" class="btn-verde">Cadastrar</button>
+    <label>Saldo Inicial (somente alunos):</label>
+    <input type="number" id="saldo" min="0" step="0.01">
+
+    <div class="flex">
+      <button type="submit" class="btn btn-verde">Cadastrar</button>
+      <button type="button" class="btn btn-azul" onclick="window.location.href='professor.html'">⬅️ Voltar</button>
+    </div>
   </form>
 </main>
-
 </body>
 </html>
