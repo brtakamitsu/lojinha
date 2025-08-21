@@ -125,7 +125,7 @@ function fecharModal() {
 
 async function confirmarCompra() {
   let total = carrinho.reduce((acc,item)=>acc+item.preco,0);
-  if(total > aluno.saldo){ alert("Saldo insuficiente!"); fecharModal(); return; }
+  if(total > aluno.saldo){ alert("❌ Saldo insuficiente!"); fecharModal(); return; }
 
   const novoSaldo = aluno.saldo - total;
   await updateDoc(doc(db,"usuarios",usuarioId),{saldo:novoSaldo});
@@ -146,7 +146,7 @@ async function confirmarCompra() {
   carrinho = [];
   atualizarCarrinho();
   fecharModal();
-  alert("Compra realizada com sucesso!");
+  alert("✅ Compra realizada com sucesso!");
 }
 
 window.voltarPainel = function(){
@@ -196,3 +196,4 @@ carregarProdutos();
 </div>
 </body>
 </html>
+
