@@ -18,37 +18,78 @@
   .btn-azul { background-color:#1976d2; color:white; }
   .btn-verde { background-color:#4CAF50; color:white; }
   .flex-center { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-bottom:10px; }
+  .checkbox-group { display:flex; flex-wrap:wrap; gap:10px; margin-top:5px; }
 </style>
 <script type="module">
-  import { db } from "./firebase.js";
-  import { collection, addDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { db } from "./firebase.js";
+import { collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  let usuarioId = localStorage.getItem("usuarioId");
-  if(!usuarioId) window.location.href="index.html";
+let usuarioId = localStorage.getItem("usuarioId");
+let escolaId = localStorage.getItem("escolaId");
+if(!usuarioId || !escolaId) window.location.href="index.html";
 
-  window.addEventListener("DOMContentLoaded", () => {
-    const form = document.getElementById("produtoForm");
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const nome = document.getElementById("nome").value.trim();
-      const preco = parseFloat(document.getElementById("preco").value) || 0;
-      const emoji = document.getElementById("emoji").value;
+window.addEventListener("DOMContentLoaded", async () => {
+  const form = document.getElementById("produtoForm");
 
-      await addDoc(collection(db, "produtos"), { nome, preco, emoji });
-      alert("✅ Produto cadastrado com sucesso!");
-      e.target.reset();
-    });
+  // Carregar turmas disponíveis
+  const turmasContainer = document.getElementById("turmasContainer");
+  const usuariosSnap = await getDocs(collection(db,"usuarios"));
+  const turmasSet = new Set();
+  usuariosSnap.forEach(docSnap => {
+    const u = docSnap.data();
+    if(u.escolaId === escolaId && u.turma) turmasSet.add(u.turma);
+  });
+  turmasSet.forEach(t => {
+    const checkbox = document.createElement("label");
+    checkbox.innerHTML = `<input type="checkbox" value="${t}"> ${t}`;
+    turmasContainer.appendChild(checkbox);
   });
 
-  window.voltarPainel = function(){
-    window.location.href="professor.html";
-  };
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nome = document.getElementById("nome").value.trim();
+    const preco = parseFloat(document.getElementById("preco").value) || 0;
+    const imagem = document.getElementById("imagem").value.trim();
+
+    const checkboxes = turmasContainer.querySelectorAll("input[type=checkbox]");
+    const turmasSelecionadas = Array.from(checkboxes).filter(c => c.checked).map(c => c.value);
+
+    if(!nome || !imagem || turmasSelecionadas.length === 0){ 
+      alert("Preencha todos os campos e selecione pelo menos uma turma."); 
+      return; 
+    }
+
+    await addDoc(collection(db, "produtos"), { 
+      nome, preco, imagem, escolaId, turmas: turmasSelecionadas 
+    });
+    alert("✅ Produto cadastrado com sucesso!");
+    e.target.reset();
+  });
+});
+
+window.voltarPainel = function(){
+  window.location.href="professor.html";
+};
+
+const inputImagem = document.getElementById("imagem");
+const preview = document.getElementById("previewImagem");
+
+inputImagem.addEventListener("input", () => {
+  const url = inputImagem.value.trim();
+  if(url){
+    preview.src = url;
+    preview.style.display = "block";
+  } else {
+    preview.style.display = "none";
+  }
+});
+
 </script>
 </head>
 <body>
 <header>
   <h1>📦 Cadastro de Produtos</h1>
-  <div class="flex-center" style="margin-top:10px;">
+  <div class="flex-center">
     <button class="btn-azul" onclick="voltarPainel()">⬅️ Voltar ao Painel</button>
   </div>
 </header>
@@ -61,24 +102,15 @@
     <label>Preço:</label>
     <input type="number" id="preco" step="0.01" required>
 
-    <label>Ícone:</label>
-    <select id="emoji" required>
-      <option value="">Selecione um ícone</option>
-      <option value="🍎">🍎 Maçã</option>
-      <option value="🍌">🍌 Banana</option>
-      <option value="🥖">🥖 Pão</option>
-      <option value="🥛">🥛 Leite</option>
-      <option value="🍫">🍫 Chocolate</option>
-      <option value="🧃">🧃 Suco</option>
-      <option value="🥩">🥩 Carne</option>
-      <option value="🧀">🧀 Queijo</option>
-      <option value="🍪">🍪 Biscoito</option>
-      <option value="🥗">🥗 Salada</option>
-    </select>
+    <label>Imagem do Produto (URL):</label>
+<input type="url" id="imagem" placeholder="https://exemplo.com/imagem.png" required>
+<img id="previewImagem" src="" alt="Preview" style="display:none; width:100px; height:100px; margin-top:10px; object-fit:contain; border:1px solid #ccc; border-radius:5px;">
+
+    <label>Turmas:</label>
+    <div id="turmasContainer" class="checkbox-group"></div>
 
     <button type="submit" class="btn-verde">Cadastrar Produto</button>
   </form>
 </main>
-
 </body>
 </html>
