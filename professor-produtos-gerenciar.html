@@ -12,6 +12,7 @@
   main { padding:20px; max-width:900px; margin:auto; }
   .grid { display: flex; flex-wrap: wrap; gap: 15px; }
   .card { background:white; padding:15px; border-radius:10px; width:200px; text-align:center; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+  .card img { width:80px; height:80px; object-fit:contain; border-radius:5px; margin-bottom:5px; }
   button { cursor:pointer; border:none; border-radius:5px; padding:8px 12px; margin:2px; transition:0.2s; }
   button:hover { opacity:0.85; }
   .btn-azul { background-color:#1976d2; color:white; }
@@ -23,72 +24,108 @@
   .modal-content { background:white; padding:20px; border-radius:10px; min-width:300px; }
   .modal input { width:100%; padding:8px; margin:5px 0; border-radius:5px; border:1px solid #ccc; }
   .modal button { width:48%; margin-top:10px; }
+  .checkbox-group { display:flex; flex-wrap:wrap; gap:10px; margin-top:5px; }
 </style>
 <script type="module">
-  import { db } from "./firebase.js";
-  import { collection, getDocs, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { db } from "./firebase.js";
+import { collection, getDocs, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  let produtoAtualId = null;
+let produtoAtualId = null;
 
-  async function carregarProdutos() {
-    const produtosSnap = await getDocs(collection(db, "produtos"));
-    const lista = document.getElementById("listaProdutos");
-    lista.innerHTML = "";
+async function carregarProdutos() {
+  const lista = document.getElementById("listaProdutos");
+  lista.innerHTML = "";
 
-    produtosSnap.forEach(p => {
-      const produto = p.data();
-      lista.innerHTML += `
-        <div class="card">
-          <h3>${produto.emoji} ${produto.nome}</h3>
-          <p>💲 ${produto.preco}</p>
-          <div>
-            <button class="btn-verde" onclick="abrirModal('${p.id}', '${produto.nome}', ${produto.preco}, '${produto.emoji}')">✏️ Editar</button>
-            <button class="btn-vermelho" onclick="excluirProduto('${p.id}')">🗑️ Excluir</button>
-          </div>
+  const produtosSnap = await getDocs(collection(db, "produtos"));
+  
+  const escolaId = localStorage.getItem("escolaId"); // escola do professor
+
+  produtosSnap.forEach(p => {
+    const produto = p.data();
+    if(produto.escolaId !== escolaId) return; // filtra somente os produtos da escola
+
+    lista.innerHTML += `
+      <div class="card">
+        <img src="${produto.imagem}" alt="${produto.nome}">
+        <h3>${produto.nome}</h3>
+        <p>💲 ${produto.preco}</p>
+        <p>Turmas: ${produto.turmas?.join(", ")}</p>
+        <div>
+          <button class="btn-verde" onclick='abrirModal("${p.id}", "${produto.nome}", ${produto.preco}, "${produto.imagem}", ${JSON.stringify(produto.turmas)})'>✏️ Editar</button>
+          <button class="btn-vermelho" onclick="excluirProduto('${p.id}')">🗑️ Excluir</button>
         </div>
-      `;
-    });
-  }
+      </div>
+    `;
+  });
+}
 
-  window.abrirModal = function(id, nome, preco, emoji) {
-    produtoAtualId = id;
-    document.getElementById("nomeProduto").value = nome;
-    document.getElementById("precoProduto").value = preco;
-    document.getElementById("emojiProduto").value = emoji;
-    document.getElementById("modal").style.display = "flex";
-  }
 
-  window.fecharModal = function() {
-    document.getElementById("modal").style.display = "none";
-    produtoAtualId = null;
-  }
+window.abrirModal = async function(id, nome, preco, imagem, turmasProdutoIds) {
+  produtoAtualId = id;
+  document.getElementById("nomeProduto").value = nome;
+  document.getElementById("precoProduto").value = preco;
+  document.getElementById("imagemProduto").value = imagem || "";
+  const preview = document.getElementById("previewProduto");
+  if(imagem){ preview.src = imagem; preview.style.display="block"; } else { preview.style.display="none"; }
 
-  window.salvarProduto = async function() {
-    const novoNome = document.getElementById("nomeProduto").value.trim();
-    const novoPreco = parseFloat(document.getElementById("precoProduto").value);
-    const novoEmoji = document.getElementById("emojiProduto").value;
+  document.getElementById("imagemProduto").addEventListener("input", e => {
+    if(e.target.value.trim()){ preview.src=e.target.value; preview.style.display="block"; }
+    else{ preview.style.display="none"; }
+  });
 
-    if (!novoNome) return alert("O nome não pode ficar vazio!");
-    if (isNaN(novoPreco)) return alert("Preço inválido!");
-    if (!novoEmoji) return alert("Escolha um emoji!");
+  const turmasContainer = document.getElementById("turmasProduto");
+  turmasContainer.innerHTML = "";
+  const usuariosSnap = await getDocs(collection(db,"usuarios"));
+  const turmasSet = new Set();
+  usuariosSnap.forEach(docSnap => {
+    const u = docSnap.data();
+    if(u.escolaId === localStorage.getItem("escolaId") && u.turma) turmasSet.add(u.turma);
+  });
 
-    const produtoRef = doc(db, "produtos", produtoAtualId);
-    await updateDoc(produtoRef, { nome: novoNome, preco: novoPreco, emoji: novoEmoji });
-    fecharModal();
-    carregarProdutos();
-  }
+  turmasSet.forEach(t => {
+    const checked = turmasProdutoIds?.includes(t) ? "checked" : "";
+    const checkbox = document.createElement("label");
+    checkbox.innerHTML = `<input type="checkbox" value="${t}" ${checked}> ${t}`;
+    turmasContainer.appendChild(checkbox);
+  });
 
-  window.excluirProduto = async function(id) {
-    if (!confirm("Tem certeza que deseja excluir este produto?")) return;
-    await deleteDoc(doc(db, "produtos", id));
-    carregarProdutos();
-  }
+  document.getElementById("modal").style.display = "flex";
+}
 
-  window.voltarPainel = function() {
-    window.location.href = "professor.html";
-  }
+window.fecharModal = function() {
+  document.getElementById("modal").style.display = "none";
+  produtoAtualId = null;
+}
 
+window.salvarProduto = async function() {
+  const novoNome = document.getElementById("nomeProduto").value.trim();
+  const novoPreco = parseFloat(document.getElementById("precoProduto").value);
+  const novaImagem = document.getElementById("imagemProduto").value.trim();
+  const checkboxes = document.getElementById("turmasProduto").querySelectorAll("input[type=checkbox]");
+  const turmasSelecionadas = Array.from(checkboxes).filter(c => c.checked).map(c=>c.value);
+
+  if(!novoNome) return alert("O nome não pode ficar vazio!");
+  if(isNaN(novoPreco)) return alert("Preço inválido!");
+  if(!novaImagem) return alert("Informe o link da imagem!");
+  if(turmasSelecionadas.length===0) return alert("Selecione ao menos uma turma!");
+
+  const produtoRef = doc(db,"produtos",produtoAtualId);
+  await updateDoc(produtoRef, { nome: novoNome, preco: novoPreco, imagem: novaImagem, turmas: turmasSelecionadas });
+  fecharModal();
   carregarProdutos();
+}
+
+window.excluirProduto = async function(id) {
+  if (!confirm("Tem certeza que deseja excluir este produto?")) return;
+  await deleteDoc(doc(db, "produtos", id));
+  carregarProdutos();
+}
+
+window.voltarPainel = function() {
+  window.location.href = "professor.html";
+}
+
+carregarProdutos();
 </script>
 </head>
 <body>
@@ -112,20 +149,11 @@
     <input type="text" id="nomeProduto"/>
     <label>Preço:</label>
     <input type="number" id="precoProduto"/>
-    <label>Emoji:</label>
-    <select id="emojiProduto">
-      <option value="">Selecione um emoji</option>
-      <option value="🍎">🍎 Maçã</option>
-      <option value="🍌">🍌 Banana</option>
-      <option value="🥖">🥖 Pão</option>
-      <option value="🥛">🥛 Leite</option>
-      <option value="🍫">🍫 Chocolate</option>
-      <option value="🧃">🧃 Suco</option>
-      <option value="🥩">🥩 Carne</option>
-      <option value="🧀">🧀 Queijo</option>
-      <option value="🍪">🍪 Biscoito</option>
-      <option value="🥗">🥗 Salada</option>
-    </select>
+    <label>Imagem (URL):</label>
+    <input type="url" id="imagemProduto"/>
+    <img id="previewProduto" src="" alt="Preview" style="display:none; width:80px; height:80px; object-fit:contain; margin-top:5px; border:1px solid #ccc; border-radius:5px;">
+    <label>Turmas:</label>
+    <div id="turmasProduto" class="checkbox-group"></div>
     <div style="display:flex; justify-content: space-between;">
       <button class="btn-verde" onclick="salvarProduto()">💾 Salvar</button>
       <button class="btn-vermelho" onclick="fecharModal()">❌ Cancelar</button>
