@@ -3,162 +3,153 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>👩‍🎓 Perfil do Aluno</title>
+<title>👩‍🎓 Painel do Aluno</title>
 <link rel="stylesheet" href="style.css"/>
 <style>
   body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f5f5; }
   header { background:#1976d2; color:white; padding:20px; text-align:center; }
   h1 { margin:0; font-size:1.8rem; }
-  main { padding:20px; max-width:800px; margin:auto; }
-  .card { background:white; padding:15px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.1); margin-bottom:20px; text-align:center; }
-  ul { list-style:none; padding:0; }
-  li { background:white; margin:5px 0; padding:10px; border-radius:5px; box-shadow:0 1px 3px rgba(0,0,0,0.1); }
-  .btn { cursor:pointer; border:none; border-radius:5px; padding:10px 15px; transition:0.2s; }
+  main { padding:20px; max-width:900px; margin:auto; }
+  .info, .form-edicao, .historico-container { background:white; padding:15px; border-radius:10px; margin-bottom:15px; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+  label { display:block; margin-top:10px; font-weight:bold; }
+  input { width:100%; padding:8px; margin-top:5px; border:1px solid #ccc; border-radius:5px; }
+  .btn { cursor:pointer; border:none; border-radius:5px; padding:8px 12px; transition:0.2s; margin-top:10px; }
   .btn:hover { opacity:0.85; }
   .btn-azul { background-color:#1976d2; color:white; }
   .btn-verde { background-color:#4CAF50; color:white; }
-  .btn-vermelho { background-color:#f44336; color:white; }
+  .btn-verde-escuro { background:#2e7d32; color:white; }
+  .btn-vermelho { background:#f44336; color:white; }
   .btn-vermelho-escuro { background:#c62828; color:white; }
-  .saldo-actions { display:flex; justify-content:center; gap:10px; margin-top:10px; flex-wrap:wrap; }
-  .saldo-actions input { width:120px; padding:6px; text-align:center; }
-  /* Modal */
-  .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); justify-content:center; align-items:center; }
-  .modal-content { background:white; padding:20px; border-radius:10px; min-width:300px; text-align:center; }
-  .modal-content input { width:80%; padding:5px; margin:10px 0; }
+  .historico-container { max-height:250px; overflow-y:auto; }
+  ul { list-style:none; padding:0; margin:0; }
+  li { background:#f1f8ff; padding:8px; border-radius:5px; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center; }
+  li.compra { background:#e8f5e9; }
 </style>
 <script type="module">
 import { db } from "./firebase.js";
-import { doc, getDoc, collection, getDocs, query, where, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 let alunoId = localStorage.getItem("alunoSelecionado");
-let alunoData = {};
-if (!alunoId) window.location.href = "professor.html";
+if(!alunoId) { alert("Aluno não selecionado."); window.location.href="professor.html"; }
 
-async function carregarPerfil() {
-  const alunoRef = doc(db, "usuarios", alunoId);
-  const alunoSnap = await getDoc(alunoRef);
-  if (!alunoSnap.exists()) {
-    alert("Aluno não encontrado!");
-    window.location.href = "professor.html";
-    return;
-  }
+let aluno = {};
 
-  alunoData = alunoSnap.data();
-  document.getElementById("infoAluno").innerHTML = `
-    <h2>${alunoData.nome}</h2>
-    <p>📚 Turma: ${alunoData.turma || "Não definida"}</p>
-    <p>💰 Saldo: <span id="saldoAtual">${alunoData.saldo || 0}</span></p>
-    <div class="saldo-actions">
-      <input type="number" id="valorSaldo" placeholder="Digite o valor"/>
-      <button class="btn-verde" onclick="alterarSaldoPersonalizado(true)">Adicionar</button>
-      <button class="btn-vermelho" onclick="alterarSaldoPersonalizado(false)">Retirar</button>
-    </div>
-    <div class="saldo-actions" style="margin-top:15px;">
-      <button class="btn btn-azul" onclick="alterarTurma()">🔄 Alterar Turma</button>
-      <button class="btn btn-vermelho-escuro" onclick="abrirModalExcluir()">❌ Excluir Perfil</button>
-    </div>
-  `;
+const nomeInput = document.getElementById("nomeAluno");
+const senhaInput = document.getElementById("senhaAluno");
+const turmaInput = document.getElementById("turmaAluno");
+const saldoInput = document.getElementById("saldoAluno");
+const historicoLista = document.getElementById("historicoLista");
 
-  carregarHistorico();
+async function carregarAluno() {
+  const snap = await getDoc(doc(db,"usuarios",alunoId));
+  if(!snap.exists()) { alert("Aluno não encontrado"); window.location.href="professor.html"; }
+  aluno = snap.data();
+  document.getElementById("alunoInfo").innerHTML = `👋 ${aluno.nome} | 💰 Saldo: ${aluno.saldo || 0}`;
+  nomeInput.value = aluno.nome || "";
+  senhaInput.value = aluno.senha || "";
+  turmaInput.value = aluno.turma || "";
+  saldoInput.value = aluno.saldo || 0;
 }
 
-async function carregarHistorico() {
-  const q = query(collection(db,"historico"), where("alunoId","==",alunoId));
-  const historicoSnap = await getDocs(q);
+window.salvarAlteracoes = async function() {
+  if(!confirm("Confirma as alterações deste aluno?")) return;
 
-  const lista = document.getElementById("listaHistorico");
-  lista.innerHTML = "";
-  historicoSnap.forEach(docSnap => {
-    const h = docSnap.data();
-    const dataFormatada = new Date(h.data).toLocaleString("pt-BR");
-    lista.innerHTML += `<li>📅 ${dataFormatada} - ${h.produto} - 💲${h.preco}</li>`;
+  await updateDoc(doc(db,"usuarios",alunoId),{
+    nome: nomeInput.value,
+    senha: senhaInput.value,
+    turma: turmaInput.value,
+    saldo: Number(saldoInput.value)
   });
+  alert("Alterações salvas com sucesso!");
+  carregarAluno();
+};
 
-  if (!lista.innerHTML) {
-    lista.innerHTML = "<li>Sem histórico de compras.</li>";
-  }
-}
-
-// --- Ajuste de saldo personalizado ---
-window.alterarSaldoPersonalizado = async function(adicionar) {
-  const input = document.getElementById("valorSaldo");
-  let valor = parseInt(input.value);
-  if (isNaN(valor) || valor <= 0) {
-    alert("Digite um valor válido!");
+window.mostrarHistorico = async function() {
+  historicoLista.innerHTML = "";
+  const q = query(collection(db,"historico"), where("alunoId","==",alunoId));
+  const snap = await getDocs(q);
+  if(snap.empty) {
+    historicoLista.innerHTML = "<li>Nenhum registro encontrado.</li>";
     return;
   }
-  if (!adicionar) valor = -valor;
-
-  const alunoRef = doc(db, "usuarios", alunoId);
-  const novoSaldo = (alunoData.saldo || 0) + valor;
-  await updateDoc(alunoRef, { saldo: novoSaldo });
-
-  alunoData.saldo = novoSaldo;
-  document.getElementById("saldoAtual").innerText = novoSaldo;
-  input.value = "";
+  snap.forEach(docSnap=>{
+    const h = docSnap.data();
+    const classe = h.produto ? "compra" : "";
+    historicoLista.innerHTML += `<li class="${classe}">${h.data ? new Date(h.data).toLocaleString() : ""} - ${h.produto || "Atualização de saldo"} - 💲${h.preco || 0}</li>`;
+  });
 };
 
-// --- Alterar turma ---
-window.alterarTurma = async function() {
-  const novaTurma = prompt("Digite a nova turma para este aluno:", alunoData.turma || "");
-  if (!novaTurma) return;
-  const alunoRef = doc(db,"usuarios",alunoId);
-  await updateDoc(alunoRef,{ turma: novaTurma });
-  alunoData.turma = novaTurma;
-  alert("✅ Turma alterada com sucesso!");
-  carregarPerfil();
+window.limparHistorico = async function() {
+  if(!confirm("Tem certeza que deseja limpar todo o histórico deste aluno?")) return;
+  const q = query(collection(db,"historico"), where("alunoId","==",alunoId));
+  const snap = await getDocs(q);
+  snap.forEach(async docSnap => {
+    await deleteDoc(doc(db,"historico",docSnap.id));
+  });
+  alert("Histórico limpo com sucesso!");
+  historicoLista.innerHTML = "";
 };
 
-// --- Excluir aluno ---
-window.abrirModalExcluir = function(){
-  document.getElementById("modalExcluir").style.display="flex";
-};
-window.fecharModalExcluir = function(){
-  document.getElementById("modalExcluir").style.display="none";
-};
-window.confirmarExclusao = async function(){
-  const senha = document.getElementById("senhaExcluir").value.trim();
-  if(!senha) return alert("Digite a senha do professor!");
+window.excluirAluno = async function() {
+  const professorId = localStorage.getItem("usuarioId"); // professor logado
+  const senha = prompt("Digite sua senha de professor para confirmar:");
+  if(!senha) return;
 
-  const professorRef = doc(db,"usuarios",localStorage.getItem("usuarioId"));
-  const professorSnap = await getDoc(professorRef);
-  if(!professorSnap.exists() || professorSnap.data().senha !== senha) return alert("Senha incorreta!");
+  // Buscar professor no Firestore
+  const professorSnap = await getDoc(doc(db, "usuarios", professorId));
+  if(!professorSnap.exists() || professorSnap.data().tipo !== "professor") {
+    alert("Erro: professor não encontrado.");
+    return;
+  }
+
+  // Verificar senha
+  if(professorSnap.data().senha !== senha) {
+    alert("Senha incorreta. Operação cancelada.");
+    return;
+  }
+
+  // Confirmação final
+  if(!confirm("Tem certeza que deseja excluir este aluno permanentemente?")) return;
 
   await deleteDoc(doc(db,"usuarios",alunoId));
-  alert("✅ Aluno excluído com sucesso!");
-  fecharModalExcluir();
+  alert("Aluno excluído com sucesso!");
   window.location.href="professor.html";
 };
 
-// --- Voltar para professor ---
-window.voltar = function(){
-  window.location.href="professor.html";
-};
 
-carregarPerfil();
+window.voltar = function() { window.location.href="professor.html"; };
+
+carregarAluno();
 </script>
 </head>
 <body>
-<header><h1>👩‍🎓 Perfil do Aluno</h1></header>
+<header>
+  <h1>👩‍🎓 Painel do Aluno</h1>
+</header>
 <main>
-  <div class="card" id="infoAluno"></div>
+  <div class="info" id="alunoInfo"></div>
 
-  <h2>📜 Histórico de Compras</h2>
-  <ul id="listaHistorico"></ul>
+  <div class="form-edicao">
+    <label>Nome:</label>
+    <input type="text" id="nomeAluno">
+    <label>Senha:</label>
+    <input type="text" id="senhaAluno">
+    <label>Turma:</label>
+    <input type="text" id="turmaAluno">
+    <label>Saldo:</label>
+    <input type="number" id="saldoAluno">
 
-  <button class="btn btn-azul" onclick="voltar()">⬅️ Voltar</button>
-
-  <!-- Modal de exclusão -->
-  <div id="modalExcluir" class="modal">
-    <div class="modal-content">
-      <h3>Confirmar Exclusão do Aluno</h3>
-      <p>Digite a senha do professor para confirmar:</p>
-      <input type="password" id="senhaExcluir" placeholder="Senha do professor">
-      <div style="display:flex; justify-content:center; gap:10px;">
-        <button class="btn btn-vermelho-escuro" onclick="confirmarExclusao()">❌ Confirmar Exclusão</button>
-        <button class="btn btn-verde" onclick="fecharModalExcluir()">Cancelar</button>
-      </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+      <button class="btn btn-verde" onclick="salvarAlteracoes()">💾 Salvar Alterações</button>
+      <button class="btn btn-azul" onclick="mostrarHistorico()">📜 Ver Histórico</button>
+      <button class="btn btn-vermelho-escuro" onclick="limparHistorico()">🗑️ Limpar Histórico</button>
+      <button class="btn btn-vermelho" onclick="excluirAluno()">❌ Excluir Aluno</button>
+      <button class="btn btn-azul" onclick="voltar()">⬅️ Voltar</button>
     </div>
+  </div>
+
+  <div class="historico-container">
+    <ul class="historico" id="historicoLista"></ul>
   </div>
 </main>
 </body>
